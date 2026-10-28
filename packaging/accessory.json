@@ -1,0 +1,56 @@
+{
+  "contract": 1,
+  "accessory": "luoke-mem",
+  "bundle_id": "ai.luoke.memory",
+  "name": "螺壳记忆",
+  "version": "0.26.2",
+  "type": "component",
+  "entry": [
+    "-m",
+    "luoke_mem",
+    "app"
+  ],
+  "resident": false,
+  "memory": false,
+  "ui_element": true,
+  "tasks": [
+    {
+      "name": "luoke-mem.typing",
+      "kind": "generate",
+      "main": false
+    },
+    {
+      "name": "luoke-mem.topics",
+      "kind": "generate",
+      "main": false
+    }
+  ],
+  "data": [],
+  "commands": {
+    "forget-tool": [
+      "-m",
+      "luoke_mem",
+      "--path",
+      "{memory}",
+      "forget-tool",
+      "{tool}"
+    ]
+  },
+  "jobs": [
+    {
+      "name": "learn",
+      "command": [
+        "-m",
+        "luoke_mem",
+        "--path",
+        "{memory}",
+        "learn"
+      ],
+      "min_interval_minutes": 120,
+      "uses_model": true,
+      "memory_mb": 100,
+      "allow_battery": false,
+      "timeout_minutes": 30
+    }
+  ]
+}

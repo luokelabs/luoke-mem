@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>螺壳记忆</title>
+<link rel="icon" type="image/png" href="/icon.png">
+<style>
+/* 螺壳界面设计规范 v1: the same tokens, type and layout as 邮件助手 */
+:root {
+  --background: #FCFAF7; --foreground: #2B1A12; --card: #FFFFFF; --sidebar: #F7F2EB;
+  --primary: #3A1F14; --primary-foreground: #FDF8F1; --muted: #F4EEE6; --accent: #F4EEE6;
+  --muted-foreground: #7A6558; --border: #ECE4DA; --input: #E2D8CC;
+  --brand: #E8556B; --brand-soft: #FCE8EA; --warning: #A86A12; --warning-soft: #FBF0D9;
+  --destructive: #C2412D; --ring: #9C8E85; --radius: 12px; --shadow-xs: 0 1px 2px rgb(43 26 18 / 0.05);
+  --sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #111111; --foreground: #FAFAF9; --card: #1A1A1A; --sidebar: #161616;
+    --primary: #F5F5F4; --primary-foreground: #141414; --muted: #232323; --accent: #262626;
+    --muted-foreground: #B8B8B6; --border: #2A2A2A; --input: #3A3A3A;
+    --brand: #F2707F; --brand-soft: #3B1F24; --warning: #E8B45A; --warning-soft: #33280F;
+    --destructive: #F07A66; --ring: #8C8079; --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; scrollbar-width: none; }
+*::-webkit-scrollbar { display: none; }
+body { margin: 0; background: var(--background); color: var(--foreground); font: 14px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; color: inherit; }
+.icon { flex: none; width: 16px; height: 16px; }
+:focus-visible { outline: 2px solid color-mix(in srgb, var(--ring) 40%, transparent); outline-offset: 2px; }
+html:not(.kbd) :is(button, summary, a):focus { outline: none; }
+
+.shell { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100vh; }
+.rail { position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 20px 12px; background: var(--sidebar);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+.rail .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; margin-bottom: 20px; font-weight: 600; white-space: nowrap; }
+.rail .logo { flex: none; width: 32px; height: 32px; border-radius: 7px; }
+.brand-text { display: grid; line-height: 1.25; }
+.brand-ver { font: 400 11px ui-monospace, "SF Mono", Menlo, monospace; color: var(--muted-foreground); }
+.brand-ver:empty { display: none; }
+#nav { display: contents; }
+.group-label { padding: 0 8px; margin: 0 0 4px; font-size: 11px; font-weight: 500; color: var(--muted-foreground); }
+.nav { list-style: none; margin: 0 0 16px; padding: 0; display: grid; gap: 2px; }
+.nav button { all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 10px; width: 100%; height: 32px;
+  padding: 0 8px; border-radius: 10px; font-size: 13px; color: var(--muted-foreground); white-space: nowrap; transition: background .15s, color .15s; }
+.nav button:hover { background: color-mix(in srgb, var(--card) 60%, transparent); color: var(--foreground); }
+.nav button[aria-current="page"] { background: var(--card); color: var(--foreground); font-weight: 500; box-shadow: var(--shadow-xs); }
+.nav button:focus-visible { outline: 2px solid color-mix(in srgb, var(--ring) 40%, transparent); }
+.nav .n { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.rail-foot { margin-top: auto; padding: 0 8px; font-size: 12px; color: var(--muted-foreground); display: flex; gap: 6px; align-items: center; }
+
+.stage { min-width: 0; padding: 32px 40px 48px; }
+.panel { max-width: 960px; margin: 0 auto; }
+.head { margin-bottom: 24px; }
+.title { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.35; margin: 0; }
+.lede { color: var(--muted-foreground); margin: 4px 0 0; max-width: 40em; }
+.subhead { font-size: 14px; font-weight: 500; margin: 32px 0 10px; display: flex; align-items: center; gap: 8px; }
+.panel > .subhead:first-of-type { margin-top: 0; }
+.subhead .count { font-size: 12px; font-weight: 400; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.subhead .end { margin-left: auto; }
+.hint { font-size: 13px; color: var(--muted-foreground); margin: 0 0 10px; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--card); color: var(--foreground); font-size: 13px; font-weight: 500; white-space: nowrap;
+  cursor: pointer; box-shadow: var(--shadow-xs); transition: background .15s, color .15s; }
+.btn:hover { background: var(--accent); }
+.btn.primary { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+.btn.primary:hover { background: color-mix(in srgb, var(--primary) 90%, var(--background)); }
+.btn.ghost { background: transparent; border-color: transparent; box-shadow: none; color: var(--muted-foreground); }
+.btn.ghost:hover { background: var(--accent); color: var(--foreground); }
+.btn.ghost.warn { color: var(--destructive); }
+.btn.danger { background: var(--destructive); border-color: var(--destructive); color: #fff; }
+.btn.danger:hover { background: color-mix(in srgb, var(--destructive) 90%, #000); }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 35%, transparent); }
+.link { all: unset; cursor: pointer; display: inline-flex; align-items: center; gap: 2px; font-size: 13px; color: var(--muted-foreground); }
+.link:hover { color: var(--foreground); }
+.link:focus-visible { outline: 2px solid color-mix(in srgb, var(--ring) 40%, transparent); border-radius: 4px; }
+
+.tag { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 6px; border: 1px solid transparent;
+  font-size: 12px; font-weight: 500; white-space: nowrap; background: var(--muted); color: var(--muted-foreground); }
+.tag.guess, .tag.proposed { background: var(--warning-soft); color: var(--warning); }
+.tag.likely, .tag.rejected, .tag.superseded, .tag.past, .tag.observed { background: var(--muted); color: var(--muted-foreground); }   /* states: neutral */
+.tag.sens { background: transparent; border-color: var(--border); color: var(--foreground); }
+
+.bar { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+input[type=search], dialog input { height: 36px; border: 1px solid var(--input); background: var(--card); border-radius: 10px; padding: 0 12px;
+  box-shadow: var(--shadow-xs); transition: border-color .15s, box-shadow .15s; }
+input[type=search] { flex: 1; min-width: 180px; max-width: 24em; }
+input:focus { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 30%, transparent); }
+input[type=checkbox] { accent-color: var(--primary); width: 16px; height: 16px; margin: 0; }
+.bar label { color: var(--muted-foreground); font-size: 13px; display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
+
+/* one list group, rows divided (brand DESIGN.md 6) */
+.list { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-xs); overflow: hidden; }
+.list > * + * { border-top: 1px solid var(--border); }
+.row { display: flex; gap: 12px; align-items: center; padding: 12px 16px; flex-wrap: wrap; }
+.row > .text { flex: 1 1 14em; min-width: 0; overflow-wrap: anywhere; }
+.row .acts { display: flex; gap: 6px; align-items: center; }
+.note { padding: 12px 16px; }
+.note .top { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.note .top .acts { display: flex; gap: 6px; }
+.note .opener { all: unset; box-sizing: border-box; cursor: pointer; flex: 1 1 14em; min-width: 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border-radius: 6px; }
+.note .opener:focus-visible { outline: 2px solid color-mix(in srgb, var(--ring) 40%, transparent); outline-offset: 2px; }
+.note .opener::before { content: ""; flex: none; width: 16px; height: 16px; background: var(--muted-foreground); transition: transform .15s;
+  -webkit-mask: var(--chev) center / 16px no-repeat; mask: var(--chev) center / 16px no-repeat; }
+.note.open .opener::before { transform: rotate(90deg); }
+.note .text { flex: 1 1 12em; min-width: 0; overflow-wrap: anywhere; }
+.note.old .text { color: var(--muted-foreground); text-decoration: line-through; text-decoration-color: var(--input); }
+.note > .meta, .note > .body { margin-left: 24px; }
+:root { --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E"); }
+.meta { color: var(--muted-foreground); font-size: 12px; margin-top: 2px; display: flex; gap: 4px 10px; flex-wrap: wrap; align-items: center; }
+.acts.note-acts { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+.note-acts .push { margin-left: auto; }
+.cites { margin-top: 10px; padding: 4px 12px; background: var(--muted); border-radius: 10px; }
+.cite { font-size: 13px; padding: 8px 0; }
+.cite + .cite { border-top: 1px solid var(--border); }
+.cite .data { color: var(--muted-foreground); font-size: 12px; margin-top: 2px; white-space: pre-wrap; word-break: break-word; }
+.cite .btn { margin-left: 8px; height: 28px; }
+.why { font-size: 13px; color: var(--muted-foreground); margin-top: 8px; }
+.more { padding: 10px 16px; }
+.empty { color: var(--muted-foreground); font-size: 13px; padding: 20px; text-align: center; }
+.list-foot { margin-top: 8px; }
+
+details.others { margin-top: 24px; }
+details.others > summary { list-style: none; cursor: pointer; color: var(--muted-foreground); font-size: 13px; display: inline-flex; align-items: center; gap: 8px; }
+details.others > summary::-webkit-details-marker { display: none; }
+details.others > summary::before { content: ""; width: 16px; height: 16px; background: currentColor; transition: transform .15s;
+  -webkit-mask: var(--chev) center / 16px no-repeat; mask: var(--chev) center / 16px no-repeat; }
+details.others[open] > summary::before { transform: rotate(90deg); }
+details.others .list { margin-top: 10px; }
+
+.box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-xs); padding: 16px 20px; }
+.status { font-size: 13px; color: var(--muted-foreground); margin: 0 0 12px; }
+.grid { overflow-x: auto; }
+.grid table { border-collapse: separate; border-spacing: 3px; width: 100%; table-layout: fixed; }
+.grid col.tool { width: 8.5em; }
+.grid th, .grid td { padding: 0; font-size: 12px; }
+.grid th.tool { text-align: left; padding-right: 8px; font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.grid th.tool .sum { display: block; font-size: 12px; font-weight: 400; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+.grid th.day { color: var(--muted-foreground); font-weight: 400; text-align: center; padding-bottom: 4px; font-variant-numeric: tabular-nums; }
+.cell { width: 100%; height: 28px; border-radius: 6px; border: 1px solid var(--border); background: transparent; padding: 0; cursor: pointer; display: block; }
+.cell.on { border-color: transparent; }
+.cell:hover { outline: 2px solid var(--muted-foreground); outline-offset: 1px; }
+.cell.picked { outline: 2px solid var(--foreground); outline-offset: 1px; }
+/* how much was written that day: one neutral ramp from the card to the primary ink */
+:root { --q1: color-mix(in srgb, var(--primary) 12%, var(--card)); --q2: color-mix(in srgb, var(--primary) 26%, var(--card));
+  --q3: color-mix(in srgb, var(--primary) 42%, var(--card)); --q4: color-mix(in srgb, var(--primary) 58%, var(--card));
+  --q5: color-mix(in srgb, var(--primary) 76%, var(--card)); --q6: var(--primary); }
+.legend { display: flex; align-items: center; gap: 4px; color: var(--muted-foreground); font-size: 12px; margin-top: 10px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+#tip { position: fixed; pointer-events: none; background: var(--card); color: var(--foreground); border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 10px; font-size: 12px; box-shadow: 0 6px 24px rgb(0 0 0 / .12); display: none; z-index: 10; }
+#tip b { font-variant-numeric: tabular-nums; font-weight: 500; }
+.recs { margin-top: 16px; border-top: 1px solid var(--border); padding-top: 12px; }
+.recs h4 { margin: 0 0 4px; font-size: 13px; font-weight: 500; }
+.recs .more { padding: 8px 0 0; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chips .btn .n { color: var(--muted-foreground); font-weight: 400; font-variant-numeric: tabular-nums; }
+
+.src-num { font-size: 13px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row .name { flex: 1 1 10em; min-width: 0; }
+.danger { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 32px; padding: 12px 16px; font-size: 13px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.danger > span { flex: 1 1 16em; color: var(--muted-foreground); }
+
+dialog { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); color: var(--foreground); width: min(36em, calc(100vw - 32px)); padding: 20px; box-shadow: 0 12px 40px rgb(0 0 0 / .18); }
+dialog::backdrop { background: rgb(0 0 0 / .35); }
+dialog h3 { margin: 0 0 6px; font-size: 16px; font-weight: 600; }
+dialog p { margin: 0 0 16px; color: var(--muted-foreground); font-size: 13px; }
+dialog p:empty { display: none; }
+dialog input { width: 100%; margin-bottom: 16px; }
+dialog .acts { display: flex; gap: 8px; justify-content: flex-end; }
+#toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--foreground); color: var(--background);
+  padding: 8px 16px; border-radius: 10px; font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+#toast.on { opacity: 1; }
+#gone { display: none; margin: 80px auto; max-width: 420px; padding: 0 16px; text-align: center; color: var(--muted-foreground); }
+#gone a { color: var(--foreground); }
+
+@media (max-width: 820px) {   /* the sidebar is one scrolling bar on top */
+  .shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; align-content: start; }
+  .rail { position: sticky; z-index: 5; height: auto; flex-direction: row; align-items: center; gap: 4px; overflow-x: auto; overflow-y: hidden;
+    padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .rail .brand { margin: 0 4px 0 0; padding: 0; }
+  .rail .brand-text, .group-label, .rail-foot { display: none; }
+  .nav { display: flex; flex: none; margin: 0; }
+  .nav button { width: auto; }
+  .nav.last { padding-left: 6px; margin-left: 2px; border-left: 1px solid var(--border); }
+  .stage { padding: 24px 24px 40px; }
+}
+@media (max-width: 640px) {
+  .stage { padding: 20px 12px 40px; }
+  .row, .note { padding: 12px; }
+  .note > .meta, .note > .body { margin-left: 0; }
+  .bar input[type=search] { flex-basis: 100%; max-width: none; }
+  .box { padding: 12px; }
+  .grid col.tool { width: 5.5em; }
+  .grid table { border-spacing: 2px; }
+  .grid th.day { font-size: 10px; }
+  .cell { height: 20px; border-radius: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="shell" id="app">
+  <aside class="rail"><div class="brand"><img class="logo" src="/icon.png" alt=""><span class="brand-text"><span class="brand-name">螺壳记忆</span><span class="brand-ver">{{VERSION}}</span></span></div><div id="nav"></div>
+    <div class="rail-foot"><svg class="icon" style="width:12px;height:12px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>只存在这台 Mac 上</div></aside>
+  <main class="stage"><div class="panel" id="main"></div></main>
+</div>
+<div id="gone">螺壳记忆的页面关了（比如正在更新）。<a href="luoke://memory">重新打开</a></div>
+<dialog id="dlg"><h3 id="dlg-title"></h3><p id="dlg-text"></p><input id="dlg-input" hidden autocomplete="off">
+  <div class="acts"><button class="btn ghost" id="dlg-no">取消</button><button class="btn primary" id="dlg-yes">确定</button></div></dialog>
+<div id="toast"></div>
+<div id="tip" role="tooltip"></div>
+<script>
+"use strict";
+const TOKEN = (() => {
+  let t = new URLSearchParams(location.search).get("t") || "";
+  try { if (t) sessionStorage.setItem("t", t); else t = sessionStorage.getItem("t") || ""; } catch (e) {}
+  if (location.search) history.replaceState(null, "", location.pathname + location.hash);   // not in history
+  return t;
+})();
+const STATUS = { proposed: "猜测", active: "生效", rejected: "不对", superseded: "已被取代", observed: "猜测", past: "以前的事" };
+const CONF = { guess: "猜测", likely: "比较确定", sure: "确定" };          // ADR 0012
+const SPEAKER = { user: "你", third_party: "别人", system: "系统" };
+const RKIND = { statement: "说的", activity: "做的", receipt: "处理建议" };
+const PAGE = 50;
+const APPS = { "com.apple.Notes": "备忘录", "com.apple.mail": "邮件", "com.apple.MobileSMS": "信息", "com.apple.Safari": "Safari 浏览器",
+  "com.google.Chrome": "Chrome", "com.tencent.xinWeChat": "微信", "com.apple.TextEdit": "文本编辑", "com.apple.iWork.Pages": "Pages 文稿",
+  "com.microsoft.Word": "Word", "com.apple.Terminal": "终端", "com.apple.dt.Xcode": "Xcode", "com.microsoft.VSCode": "VS Code",
+  "com.tinyspeck.slackmacgap": "Slack", "com.electron.lark": "飞书", "com.alibaba.DingTalkMac": "钉钉", "com.tencent.qq": "QQ" };
+let summary = null, view = { page: "overview" }, query = "", showOld = false, offset = 0;
+
+// lucide icons (brand DESIGN.md 5), 16px, stroke 2
+const ICONS = {
+  house: '<path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  lightbulb: '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+  user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  star: '<path d="M11.525 2.295a.53.53 0 0 1 .95 0l2.31 4.679a2.123 2.123 0 0 0 1.595 1.16l5.166.756a.53.53 0 0 1 .294.904l-3.736 3.638a2.123 2.123 0 0 0-.611 1.878l.882 5.14a.53.53 0 0 1-.771.56l-4.618-2.428a2.122 2.122 0 0 0-1.973 0L6.396 21.01a.53.53 0 0 1-.77-.56l.881-5.139a2.122 2.122 0 0 0-.611-1.879L2.16 9.795a.53.53 0 0 1 .294-.906l5.165-.755a2.122 2.122 0 0 0 1.597-1.16z"/>',
+  ban: '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
+  sliders: '<path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/>',
+  message: '<path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"/><path d="M7 11h10"/><path d="M7 15h6"/><path d="M7 7h8"/>',
+  brain: '<path d="M12 18V5"/><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"/><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"/><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"/><path d="M18 18a4 4 0 0 0 2-7.464"/><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"/><path d="M6 18a4 4 0 0 1-2-7.464"/><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"/>',
+  database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+  right: '<path d="m9 18 6-6-6-6"/>',
+};
+const KIND_ICON = { fact: "user", interest: "star", dislike: "ban", preference: "sliders", term: "message" };
+function icon(name) {
+  const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  s.setAttribute("class", "icon"); s.setAttribute("viewBox", "0 0 24 24"); s.setAttribute("fill", "none"); s.setAttribute("stroke", "currentColor");
+  s.setAttribute("stroke-width", "2"); s.setAttribute("stroke-linecap", "round"); s.setAttribute("stroke-linejoin", "round"); s.setAttribute("aria-hidden", "true");
+  s.innerHTML = ICONS[name] || ""; return s;
+}
+
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === "class") e.className = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else if (v !== null && v !== undefined) e.setAttribute(k, v);
+  }
+  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) e.append(k instanceof Node ? k : document.createTextNode(String(k)));
+  return e;
+}
+async function api(path, body) {
+  const opt = { headers: { "X-Luoke-Token": TOKEN } };
+  if (body !== undefined) { opt.method = "POST"; opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
+  let r;
+  try { r = await fetch(path, opt); } catch (e) { gone(); throw e; }
+  if (r.status === 403) { gone(); throw new Error("forbidden"); }
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || "出错了");
+  return data;
+}
+function gone() { document.getElementById("app").style.display = "none"; document.getElementById("gone").style.display = "block"; }
+function toast(t) { const e = document.getElementById("toast"); e.textContent = t; e.classList.add("on"); clearTimeout(toast.h); toast.h = setTimeout(() => e.classList.remove("on"), 2200); }
+function ask(title, text, opts) {
+  opts = opts || {};
+  const d = document.getElementById("dlg"), inp = document.getElementById("dlg-input"), yes = document.getElementById("dlg-yes");
+  document.getElementById("dlg-title").textContent = title;
+  document.getElementById("dlg-text").textContent = text;
+  inp.hidden = !opts.input; inp.value = opts.value || ""; inp.placeholder = opts.placeholder || "";
+  yes.textContent = opts.yes || "确定"; yes.className = "btn " + (opts.warn ? "danger" : "primary");
+  return new Promise(res => {
+    const done = v => { d.close(); yes.onclick = null; document.getElementById("dlg-no").onclick = null; res(v); };
+    yes.onclick = () => done(opts.input ? inp.value : true);
+    document.getElementById("dlg-no").onclick = () => done(null);
+    d.onclose = () => res(null);
+    d.showModal(); if (opts.input) inp.focus();
+  });
+}
+// what a tool kept with a record, in a line or two: the mails it read, the text, the rest as 名：值 (ADR 0013)
+function dataLine(d) {
+  if (!d || typeof d !== "object") return null;
+  const parts = [];
+  if (Array.isArray(d.mails)) for (const m of d.mails.slice(0, 3)) parts.push(`《${m.subject || ""}》${(m.text || "").slice(0, 80)}`);
+  if (typeof d.text === "string") parts.push(d.text.slice(0, 160));
+  if (typeof d.summary === "string") parts.push("讲的是：" + d.summary);
+  for (const [k, v] of Object.entries(d)) {
+    if (["mails", "text", "summary", "via", "auto"].includes(k) || v === null || typeof v === "object") continue;
+    if (k === "app") { if (APPS[v]) parts.push("在" + APPS[v] + "里"); continue; }   // a bundle id means nothing to the user
+    parts.push(`${k}：${v}`);
+  }
+  return parts.length ? el("div", { class: "data" }, parts.join(" · ")) : null;
+}
+function when(s) { return (s || "").slice(0, 16); }
+function head(title, lede) { return el("div", { class: "head" }, el("h1", { class: "title" }, title), lede ? el("p", { class: "lede" }, lede) : null); }
+function subhead(title, count, end) { return el("h2", { class: "subhead" }, title, count ? el("span", { class: "count" }, count) : null, end ? el("span", { class: "end" }, end) : null); }
+function sens(n) { return (n.sensitive_labels || []).map(l => el("span", { class: "tag sens", title: "要你确认才算数" }, l)); }
+
+async function load() {
+  fromHash();
+  summary = await api("/api/summary");
+  drawNav(); await drawMain();
+}
+function drawNav() {
+  const nav = document.getElementById("nav"); nav.replaceChildren();
+  const item = (label, n, v, ic) => {
+    const on = view.kind === v.kind && view.status === v.status && view.page === v.page;
+    return el("li", {}, el("button", { "aria-current": on ? "page" : null, title: label,
+      onclick: () => { view = v; offset = 0; query = ""; drawNav(); drawMain(); } }, icon(ic), el("span", {}, label), n ? el("span", { class: "n" }, n) : null));
+  };
+  nav.append(el("ul", { class: "nav" }, item("概览", "", { page: "overview" }, "house"), item("猜测", summary.proposed, { kind: "", status: "proposed" }, "lightbulb"),
+    item("最近记下的", "", { page: "recent" }, "clock"), item("以前的事", summary.past || "", { kind: "", status: "past" }, "history")));
+  const kinds = el("ul", { class: "nav" });
+  for (const k of summary.kinds) {
+    if (!k.active && !k.proposed && !k.rejected && !k.superseded && !["fact", "interest", "dislike", "preference", "term"].includes(k.kind)) continue;
+    kinds.append(item(k.label, k.active, { kind: k.kind, status: "active" }, KIND_ICON[k.kind] || "brain"));
+  }
+  nav.append(el("p", { class: "group-label" }, "理解"), kinds,
+    el("ul", { class: "nav last" }, item("来源", summary.sources.length, { page: "sources" }, "database")));
+  nav.querySelector("[aria-current]")?.scrollIntoView({ block: "nearest", inline: "nearest" });   // the narrow bar keeps the page in view
+}
+async function drawMain() {
+  const main = document.getElementById("main"); main.replaceChildren();
+  if (view.page === "overview") return drawOverview(main);
+  if (view.page === "note") return drawOneNote(main, view.id);
+  if (view.page === "recent") return drawRecent(main);
+  if (view.page === "sources") return drawSources(main);
+  const kind = summary.kinds.find(k => k.kind === view.kind);
+  const guesses = view.status === "proposed" || view.status === "observed";
+  main.append(guesses ? head("猜测", "还没拿来用。不点也没关系，依据够了会自己记下。")
+    : view.status === "past" ? head("以前的事", "很久没再见到依据，不当成现在的事用。")
+    : head(kind.label));
+  const search = el("input", { type: "search", placeholder: "搜索", value: query });
+  search.addEventListener("input", () => { query = search.value; offset = 0; clearTimeout(drawMain.h); drawMain.h = setTimeout(drawList, 200); });
+  const bar = el("div", { class: "bar" }, search);
+  if (!guesses && view.status !== "past") {
+    const box = el("input", { type: "checkbox" }); box.checked = showOld;
+    box.addEventListener("change", () => { showOld = box.checked; offset = 0; drawList(); });
+    bar.append(el("label", {}, box, "显示已否定和旧版本"));
+  }
+  main.append(bar, el("div", { id: "list" }));
+  await drawList();
+}
+async function drawList() {
+  const list = document.getElementById("list"); if (!list) return;
+  const guesses = view.status === "proposed" || view.status === "observed";
+  const status = guesses ? "proposed,observed" : view.status === "past" ? "past" : (showOld ? "active,rejected,superseded" : "active");
+  const p = new URLSearchParams({ kind: view.kind, status, q: query, offset, limit: PAGE, ...(guesses ? { from: "own" } : {}) });
+  const data = await api("/api/notes?" + p);
+  if (offset === 0) list.replaceChildren(el("div", { class: "list" }));
+  const group = list.firstChild;
+  group.querySelector(".more")?.remove();
+  if (!data.total) group.append(el("div", { class: "empty" }, query ? "没有找到" : "这里还没有"));
+  for (const n of data.notes) group.append(drawNote(n));
+  if (data.offset + data.notes.length < data.total)
+    group.append(el("div", { class: "more" }, el("button", { class: "link", onclick: () => { offset += PAGE; drawList(); } }, `再显示一些（还有 ${data.total - data.offset - data.notes.length} 条）`)));
+  if (guesses && offset === 0 && summary.others && !view.kind) list.append(drawOthers());
+}
+// Facts read off others' letters, not seen enough yet: never asked, never used; folded away, not counted
+function drawOthers() {
+  const inner = el("div", { class: "list" });
+  const box = el("details", { class: "others" }, el("summary", {}, `别人来信里看到的 ${summary.others} 条`), inner);
+  box.addEventListener("toggle", async () => {
+    if (!box.open || inner.childElementCount) return;
+    const data = await api("/api/notes?" + new URLSearchParams({ status: "proposed,observed", from: "others", q: query, limit: 200 }));
+    for (const n of data.notes) inner.append(drawNote(n));
+    if (data.total > data.notes.length) inner.append(el("div", { class: "more hint" }, `还有 ${data.total - data.notes.length} 条，可以搜索找`));
+  });
+  return box;
+}
+function drawNote(n) {
+  const box = el("div", { class: "note" + (n.status === "rejected" || n.status === "superseded" ? " old" : "") });
+  const body = el("div", { class: "body" });
+  const settle = n.status === "proposed" || n.status === "observed" || n.status === "past";   // the page's own task, on the row
+  const opener = el("button", { class: "opener", "aria-expanded": "false", onclick: () => toggle() },   // opens the evidence
+    el("span", { class: "text" }, n.text), sens(n),
+    n.confidence === "guess" && view.status === "proposed" ? null       // the page already says 猜测
+      : n.confidence === "guess" ? el("span", { class: "tag guess" }, CONF.guess)
+      : n.status !== "active" && n.status !== view.status ? el("span", { class: "tag " + n.status }, STATUS[n.status] || n.status) : null);
+  const top = el("div", { class: "top" }, opener,                     // the buttons sit beside it, not inside
+    settle ? settleButtons(n, async (msg) => { toast(msg); summary = await api("/api/summary"); drawNav(); offset = 0; await drawList(); }) : null);
+  const meta = el("div", { class: "meta" },
+    view.kind ? null : el("span", {}, n.kind_label),
+    el("span", {}, n.origin === "user" ? "你写的" : n.source ? n.source : "推断的"),
+    el("span", {}, n.name),
+    el("span", {}, n.status === "past" && n.fresh ? `大约 ${n.fresh.slice(0, 4)} 年` : when(n.formed_at)),
+    el("span", {}, n.cites ? `依据 ${n.cites} 条` : "没有依据"),
+    n.alike ? el("span", {}, `可能和上下 ${n.alike} 条是同一件`) : null);
+  box.append(top, meta, body);
+  let open = false;
+  async function toggle() {
+    open = !open; box.classList.toggle("open", open); opener.setAttribute("aria-expanded", String(open)); body.replaceChildren(); if (!open) return;
+    const full = await api("/api/note?id=" + n.id);
+    if (full.why) body.append(el("div", { class: "why" }, "理由：" + full.why));
+    const cites = el("div", { class: "cites" });
+    for (const c of full.cites) cites.append(el("div", { class: "cite" }, el("div", {}, c.text), dataLine(c.data),
+      el("div", { class: "meta" }, el("span", {}, `${SPEAKER[c.speaker] || c.speaker}${RKIND[c.kind] || c.kind}`), el("span", {}, c.name + (c.via ? " · 经" + c.via : "")), el("span", {}, when(c.happened_at)), sens(c))));
+    if (!full.cites.length) cites.append(el("div", { class: "cite" }, "没有依据"));
+    for (const x of full.merged || [])          // one fact written again in other words, folded in
+      cites.append(el("div", { class: "cite" }, el("span", { class: "hint" }, "并进来的说法："), x.text,
+        el("button", { class: "btn", onclick: async () => { await api("/api/change", { op: "split", id: x.id }); toast("已拆出来，成了一条单独的猜测"); open = false; toggle(); } }, "拆出来")));
+    body.append(cites, actions(full));
+  }
+  return box;
+}
+// 对，确认 / 不对 (现在还是 / 不对 for 以前的事) on the row itself; a click there does not open the row
+function settleButtons(n, done) {
+  const past = n.status === "past";
+  const go = op => async e => { e.stopPropagation(); await api("/api/change", { op, id: n.id }); done(op === "confirm" ? (past ? "记下了：现在还是" : "已确认") : past ? "已否定" : "已否定，以后不再提"); };
+  return el("span", { class: "acts", onclick: e => e.stopPropagation(), onkeydown: e => e.stopPropagation() },
+    el("button", { class: "btn primary", onclick: go("confirm") }, past ? "现在还是" : "对，确认"), el("button", { class: "btn", onclick: go("reject") }, "不对"));
+}
+function actions(n) {
+  const acts = el("div", { class: "acts note-acts" });
+  const done = async (msg) => { toast(msg); summary = await api("/api/summary"); drawNav(); offset = 0; await drawList(); };
+  if (n.status === "active") {
+    acts.append(el("button", { class: "btn", onclick: async () => { await api("/api/change", { op: "reject", id: n.id }); done("已否定"); } }, "不对"));
+  }
+  if (n.status === "proposed" || n.status === "observed" || n.status === "active") {
+    acts.append(el("button", { class: "btn", onclick: async () => {
+      const t = await ask("修改", "旧的会留着，标为已被取代。", { input: true, value: n.text, yes: "保存" });
+      if (t && t.trim() && t.trim() !== n.text) { await api("/api/change", { op: "revise", id: n.id, text: t }); done("已修改"); }
+    } }, "修改"));
+  }
+  acts.append(el("button", { class: "btn ghost warn push", onclick: async () => {
+    const ok = await ask("从记忆里忘掉这一条？", "这条、它的旧版本，以及只被它引用的记录都会删掉，不能恢复。", { yes: "忘掉", warn: true });
+    if (ok) { await api("/api/change", { op: "forget", id: n.id }); done("已从记忆里忘掉"); }
+  } }, "忘掉"));
+  return acts;
+}
+async function drawRecent(main) {
+  // what was taken down without asking (ADR 0011): to look at, strike, or forget
+  const r = await api("/api/recent");
+  main.append(head("最近记下的", `${r.days} 天里没问你、已经在用的。`));
+  const list = el("div", { id: "list" }, el("div", { class: "list" }));
+  main.append(list);
+  if (!r.notes.length) { list.firstChild.append(el("div", { class: "empty" }, "这些天没有直接记下的")); return; }
+  const group = list.firstChild;
+  const more = from => {
+    group.querySelector(".more")?.remove();
+    for (const n of r.notes.slice(from, from + PAGE)) group.append(drawNote(n));
+    if (r.notes.length > from + PAGE) group.append(el("div", { class: "more" },
+      el("button", { class: "link", onclick: () => more(from + PAGE) }, `再显示一些（还有 ${r.notes.length - from - PAGE} 条）`)));
+  };
+  more(0);
+}
+function go(v) { view = v; offset = 0; query = ""; drawNav(); drawMain(); }
+async function drawOneNote(main, id) {
+  // opened at one note (#note=N, luoke-agent's 看依据): the note and all its evidence, as in its kind's list
+  let n;
+  try { n = await api("/api/note?id=" + id); } catch (e) { main.append(head("这条理解"), el("div", { class: "list" }, el("div", { class: "empty" }, "这条理解已经不在了"))); return; }
+  main.append(head(n.kind_label));
+  const list = el("div", { id: "list" }, el("div", { class: "list" }));
+  main.append(list);
+  const box = drawNote({ ...n, cites: n.cites.length });
+  list.firstChild.append(box);
+  box.querySelector(".opener").click();                       // open its evidence right away
+}
+function fromHash() {
+  const m = /note=(\d+)/.exec(location.hash);
+  if (m) { view = { page: "note", id: +m[1] }; return true; }
+  if (/view=recent/.test(location.hash)) { view = { page: "recent" }; return true; }
+  return false;
+}
+window.addEventListener("hashchange", () => { if (fromHash()) { drawNav(); drawMain(); } });
+function mmdd(day) { const [, m, d] = day.split("-"); return `${+m}月${+d}日`; }
+const all = (label, to) => el("div", { class: "list-foot" }, el("button", { class: "link", onclick: () => go(to) }, label, icon("right")));
+async function drawOverview(main) {
+  const o = await api("/api/overview");
+  main.append(head("概览"));
+  // what waits for the user comes first
+  main.append(subhead("猜测", o.proposed_total || null));
+  const wait = el("div", { class: "list" });
+  if (!o.proposed_total) wait.append(el("div", { class: "empty" }, "现在没有猜测"));
+  for (const n of o.proposed) {
+    const done = async (op, msg) => { await api("/api/change", { op, id: n.id }); toast(msg); summary = await api("/api/summary"); drawNav(); drawMain(); };
+    wait.append(el("div", { class: "row" },
+      el("div", { class: "text" }, n.text, el("div", { class: "meta" }, el("span", {}, n.kind_label), el("span", {}, n.name), sens(n))),
+      el("div", { class: "acts" }, el("button", { class: "btn primary", onclick: () => done("confirm", "已确认") }, "对，确认"),
+        el("button", { class: "btn", onclick: () => done("reject", "已否定，以后不再提") }, "不对"))));
+  }
+  main.append(wait);
+  if (o.proposed_total > o.proposed.length) main.append(all(`查看全部 ${o.proposed_total} 条`, { kind: "", status: "proposed" }));
+  // what was taken down without asking (ADR 0011)
+  if (o.recent_total) {
+    main.append(subhead("最近记下的", o.recent_total));
+    const rc = el("div", { class: "list" });
+    for (const n of o.recent) {
+      const no = async () => { await api("/api/change", { op: "reject", id: n.id }); toast("已否定，以后不再提"); summary = await api("/api/summary"); drawNav(); drawMain(); };
+      rc.append(el("div", { class: "row" },
+        el("div", { class: "text" }, n.text, el("div", { class: "meta" }, el("span", {}, n.kind_label), el("span", {}, n.source), sens(n))),
+        el("div", { class: "acts" }, el("button", { class: "btn", onclick: no }, "不对"))));
+    }
+    main.append(rc, all("查看全部和依据", { page: "recent" }));
+  }
+  // that collecting happens: how much each tool wrote each day
+  main.append(subhead(`最近 ${o.days.length} 天记下的`));
+  const rec = el("div", { class: "box" },
+    el("p", { class: "status" }, o.learning && o.learning.at ? `上次归纳：${o.learning.at.slice(5)}，${o.learning.outcome}` : "还没有归纳过，会在你不用电脑时进行"));
+  if (!o.tools.length) rec.append(el("div", { class: "empty" }, "这几天还没有工具记下东西"));
+  else {
+    const max = Math.max(1, ...o.tools.flatMap(t => t.counts));
+    const level = c => c ? Math.max(1, Math.ceil(6 * Math.log(1 + c) / Math.log(1 + max))) : 0;
+    const tip = document.getElementById("tip");
+    const show = (e, t, i) => { tip.replaceChildren(el("b", {}, `${t.counts[i]} 条`), ` · ${t.name} · ${mmdd(o.days[i])}`); tip.style.display = "block";
+      const r = e.currentTarget.getBoundingClientRect(); tip.style.left = Math.min(r.left, innerWidth - tip.offsetWidth - 8) + "px"; tip.style.top = (r.bottom + 6) + "px"; };
+    const hide = () => { tip.style.display = "none"; };
+    const headRow = el("tr", {}, el("th", {}), o.days.map((d, i) => el("th", { class: "day" }, i === o.days.length - 1 ? "今" : String(+d.slice(8)))));
+    const table = el("table", {}, el("colgroup", {}, el("col", { class: "tool" })), headRow);
+    const panel = el("div");
+    for (const t of o.tools) {
+      table.append(el("tr", {}, el("th", { class: "tool", title: t.name }, t.name, el("span", { class: "sum" }, `${t.counts.reduce((a, b) => a + b, 0)} 条`)),
+        t.counts.map((c, i) => el("td", {}, el("button", { class: "cell" + (c ? " on" : ""), style: c ? `background: var(--q${level(c)})` : null,
+          "aria-label": `${t.name}，${mmdd(o.days[i])}，${c} 条`,
+          onpointerenter: e => show(e, t, i), onpointerleave: hide, onfocus: e => show(e, t, i), onblur: hide,
+          onclick: e => { hide(); table.querySelectorAll(".picked").forEach(x => x.classList.remove("picked")); e.currentTarget.classList.add("picked"); drawRecords(panel, t, o.days[i], c); } })))));
+    }
+    rec.append(el("div", { class: "grid" }, table),
+      el("div", { class: "legend" }, "少", [1, 2, 3, 4, 5, 6].map(k => el("i", { style: `background: var(--q${k})` })), "多"), panel);
+  }
+  main.append(rec);
+  // what is understood so far
+  main.append(subhead("理解"), el("div", { class: "chips" }, summary.kinds.filter(k => k.active || ["fact", "interest", "dislike", "preference", "term"].includes(k.kind))
+    .map(k => el("button", { class: "btn", onclick: () => go({ kind: k.kind, status: "active" }) }, icon(KIND_ICON[k.kind] || "brain"), k.label, el("span", { class: "n" }, k.active)))));
+}
+async function drawRecords(panel, t, day, count, from) {
+  from = from || 0;
+  if (!from) panel.replaceChildren(el("div", { class: "recs" }, el("h4", {}, `${t.name} · ${mmdd(day)} · ${count} 条`)));
+  const box = panel.firstChild;
+  box.querySelector(".more")?.remove();
+  if (!count) { box.append(el("div", { class: "empty" }, "这一天没有记下东西")); return; }
+  const data = await api("/api/records?" + new URLSearchParams({ tool: t.tool, day, offset: from, limit: PAGE }));
+  for (const r of data.records) box.append(el("div", { class: "cite" }, el("div", {}, r.text),
+    el("div", { class: "meta" }, el("span", {}, r.topic), el("span", {}, r.said), el("span", {}, (r.recorded_at || "").slice(11, 16)), sens(r))));
+  if (data.more) box.append(el("div", { class: "more" }, el("button", { class: "link", onclick: () => drawRecords(panel, t, day, count, from + PAGE) }, "再显示一些")));
+}
+function drawSources(main) {
+  main.append(head("来源", "卸载一个工具不会删它写的；你确认、修改过和亲口说的，忘掉工具时也留着。"));
+  const list = el("div", { class: "list" });
+  if (!summary.sources.length) list.append(el("div", { class: "empty" }, "记忆里还什么都没有"));
+  for (const s of summary.sources) list.append(el("div", { class: "row" }, el("span", { class: "name" }, s.name),
+    el("span", { class: "src-num" }, `${s.records} 条记录 · ${s.notes} 条理解`),
+    s.tool === "luoke-mem" ? null : el("button", { class: "btn ghost warn", onclick: async () => {
+      const n = await api("/api/forget-tool", { tool: s.tool, dry_run: true });
+      const ok = await ask(`从记忆里忘掉${s.name}写的？`, `会删掉 ${n.records} 条记录和 ${n.notes} 条理解，不能恢复。你表过态的、修改过的、亲口说的会留着；${s.name}本身不受影响。`, { yes: "忘掉", warn: true });
+      if (ok) { await api("/api/forget-tool", { tool: s.tool }); toast("已从记忆里忘掉"); await load(); }
+    } }, "忘掉")));
+  main.append(list, el("div", { class: "danger" }, el("span", {}, "清空整份记忆：所有记录和理解都删掉，不能恢复。"),
+    el("button", { class: "btn ghost warn", onclick: async () => {
+      const w = await ask("清空整份记忆？", `所有工具写的记录和理解都会删掉，不能恢复；各工具照常能用，从头记起。确定的话，请输入「${summary.clear_word}」。`, { input: true, placeholder: summary.clear_word, yes: "清空", warn: true });
+      if (w === null) return;
+      try { await api("/api/forget-all", { confirm: w }); toast("已清空"); view = { page: "overview" }; await load(); } catch (e) { toast(e.message); }
+    } }, "清空")));
+}
+window.addEventListener("unhandledrejection", e => { if (e.reason && e.reason.message !== "forbidden") toast(e.reason.message || "出错了"); });
+document.addEventListener("keydown", e => { if (e.key === "Tab") document.documentElement.classList.add("kbd"); });   // rings for the keyboard only
+document.addEventListener("mousedown", () => document.documentElement.classList.remove("kbd"));
+const ping = () => api("/api/ping").catch(() => {});
+setInterval(ping, 60000);                                  // while the tab is open, in the background too
+document.addEventListener("visibilitychange", ping);       // back to the tab: still there, or say it closed
+load();
+</script>
+</body>
+</html>

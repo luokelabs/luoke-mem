@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "luoke-mem"
+version = "0.26.2"
+description = "螺壳记忆：螺壳工具共用的本机记忆（可追溯、可撤回、不出本机）"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+dependencies = []          # standard library only
+
+[tool.setuptools]
+packages = ["luoke_mem"]
+
+[tool.setuptools.package-data]
+luoke_mem = ["ui.html", "icon.png"]

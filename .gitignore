@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+.DS_Store
+*.egg-info/
+build/
+dist/
+.venv/
+# working notes for coding sessions: kept on the machine, not in the tree
+CLAUDE.md
+CLAUDE.local.md
+*.noindex/
+.env
+.env.*
+# memories made by tests and experiments, and what sits beside a memory file
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*-ui.json
+*-learn.lock
