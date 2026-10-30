@@ -318,3 +318,4 @@ rid = mem.record("user", "statement", text, topic="ime-commit", sensitive=sensit
 - **不碰真实的记忆**：测试把 `LUOKE_HOME` 固定在临时目录，没给路径的也落不到 `~/.luoke`；实验一律传临时 `path`；停页面服务只按自己起的进程号（状态文件里的 pid）。
 - **单独打一个 .app**（开发和内部测试用）：`scripts/package-app.sh`，用 luoke-core 的打包脚本（自带 python-build-standalone 3.12、预编译、ad-hoc 签名），放在 `build/app.noindex/`（Spotlight 不进 `*.noindex`，LaunchServices 就不会把仓库里的开发版当成在用的那份）。`scripts/check-minos.sh` 核对 app 里每个程序的最低 macOS 不高于 `LSMinimumSystemVersion`。`scripts/install-app.sh` 换装、回滚开发机上的一份；`scripts/internal-app.sh` 把公证好的一份交给螺壳的内部版。正式发布时 luoke_mem 打在螺壳里，签名公证由螺壳的发布脚本做。
 - **评测**：`bench/run_typing.py`、`bench/run_topics.py`，见「归纳理解」里的「评测集」。
+- **公开仓库**：团队在私有仓库开发，公开仓库的 `main` 是私有仓库里的 `public` 分支。`scripts/export-public.sh` 把 `main` 的树作为一个新提交加在 `public` 上、扫过泄漏，只在本地提交；推出去另行确认。
